@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<!--
+    ECHO CHAMBER BUSTER - AI-Powered Adversarial Debate Platform
+    
+    Overview: This application fosters critical thinking through relentless, evidence-based debates
+    powered by Google's Gemini API. The AI takes an adversarial stance, challenging users with
+    counterarguments backed by philosophical wisdom, spiritual texts, and scientific research.
+    
+    TEST INSTRUCTIONS:
+    
+    1. Browser Requirements:
+       - Open index.html in a modern browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
+       - Ensure JavaScript is enabled
+       - Requires internet connection for Gemini API calls
+    
+    2. Initial Load Test:
+       - Verify a controversial topic loads automatically on first visit
+       - Check that the topic appears in the chat interface
+       - Confirm no console errors (press F12 to check Developer Console)
+    
+    3. Debate Functionality:
+       - Type a response to the topic and press Enter or click Send
+       - Verify AI provides counter-arguments that oppose your position
+       - Check that AI responses cite at least one of:
+         * Philosophers (Socrates, Nietzsche, Einstein, etc.)
+         * Spiritual texts (Bhagavad Gita, Bible, Quran, Tao Te Ching, etc.)
+         * Scientific research or historical evidence
+    
+    4. Every-3rd-Response Humility:
+       - Continue the debate for 6+ exchanges
+       - Verify that every 3rd AI response includes the message:
+         "Remember, no truth is absolute—flaws lurk in every certainty."
+    
+    5. Surrender Detection:
+       - Type surrender phrases like "I give up", "You're right", or "Enough"
+       - Verify AI responds with an encouraging wrap-up message
+       - Check that AI acknowledges your intellectual humility
+    
+    6. New Debate Feature:
+       - Click the "New Debate" button in the sidebar
+       - Verify a fresh controversial topic is generated
+       - Confirm conversation history is cleared
+    
+    7. Theme Toggle:
+       - Click the theme toggle button (Dark Mode / Light Mode)
+       - Verify colors switch between light and dark themes
+       - Reload the page and check that theme preference persists
+    
+    8. Conversation History:
+       - Complete 2-3 debates (each with multiple exchanges)
+       - Check that "Recent Debates" section shows previous topics
+       - Click on a history item and verify it loads that conversation
+    
+    9. Mobile Responsiveness:
+       - Resize browser window to <768px width
+       - Verify hamburger menu appears in top-left
+       - Test sidebar slides out when clicking hamburger
+       - Confirm sidebar closes when clicking outside
+    
+    10. Error Handling:
+        - Disconnect internet briefly and send a message
+        - Verify retry logic kicks in with countdown messages
+        - Check that fallback response appears after retries exhausted
+    
+    KNOWN LIMITATIONS:
+    - API key is embedded client-side (DEMO ONLY - proxy via backend in production)
+    - Requires active internet connection for all AI features
+    - Service worker disabled (app requires API connectivity)
+    - Voice input mic icon is placeholder only (feature not implemented)
+    
+    DEPLOYMENT NOTES:
+    - Can be hosted on GitHub Pages, Vercel, or Netlify as-is
+    - No build process required - pure HTML/CSS/JS
+    - Works on file:// protocol but CSP may cause warnings
+    - For production: move API key to backend proxy server
+    
+    BROWSER CONSOLE:
+    - Open DevTools (F12) to see detailed API logs
+    - Look for "Gemini API Response" for successful calls
+    - Check for "Gemini API Error" if issues occur
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Echo Chamber Buster</title>
+    <meta name="description" content="Challenge your beliefs through adversarial AI-powered debates">
+    
+    <!-- Security and Compatibility -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="no-referrer">
+    
+    <!-- Security: CSP restricts resource loading. 'unsafe-inline' needed for embedded scripts/styles. In production, consider moving to external files. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://generativelanguage.googleapis.com; img-src 'self' data:; font-src 'self';">
+    
+    <!-- Preconnect to Google APIs -->
+    <link rel="preconnect" href="https://generativelanguage.googleapis.com">
+    
+    <style>
+        /* CSS Variables for Theming */
+        :root {
+            --sidebar-bg: #202123;
+            --sidebar-border: #4d4d4f;
+            --main-bg: #343541;
+            --message-bg: #444654;
+            --user-message-bg: #10A37F;
+            --text-primary: #ECECF1;
+            --text-secondary: #8E8EA0;
+            --border-color: #4d4d4f;
+            --hover-bg: #2A2B32;
+            --focus-color: #10A37F;
+        }
+
+        [data-theme="light"] {
+            --sidebar-bg: #F7F7F8;
+            --sidebar-border: #E5E5E5;
+            --main-bg: #FFFFFF;
+            --message-bg: #F2F2F2;
+            --user-message-bg: #10A37F;
+            --text-primary: #1A1A1A;
+            --text-secondary: #6B7280;
+            --border-color: #E5E5E5;
+            --hover-bg: #F0F0F0;
+            --focus-color: #10A37F;
+        }
+
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--main-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--sidebar-border);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: transform 0.3s ease-in-out;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--sidebar-border);
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .app-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #10A37F, #1A73E8);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .new-chat-btn:hover {
+            background-color: var(--hover-bg);
+            transform: translateY(-1px);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .history-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0 20px 8px;
+        }
+
+        .history-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border-left: 2px solid transparent;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .history-item:hover {
+            background-color: var(--hover-bg);
+            border-left-color: var(--focus-color);
+        }
+
+        .history-item.active {
+            background-color: var(--hover-bg);
+            border-left-color: var(--focus-color);
+        }
+
+        .theme-toggle {
+            padding: 20px;
+            border-top: 1px solid var(--sidebar-border);
+        }
+
+        .theme-btn {
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .theme-btn:hover {
+            background-color: var(--hover-bg);
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        /* Main Chat Area */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 0;
+        }
+
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .message {
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            opacity: 0;
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .message.user .message-avatar {
+            background-color: var(--user-message-bg);
+            color: white;
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message-content {
+            max-width: 80%;
+            background-color: var(--message-bg);
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.user .message-content {
+            background-color: var(--user-message-bg);
+            color: white;
+        }
+
+        .message-text {
+            font-size: 16px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .message.user .message-time {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Input Area */
+        .input-area {
+            position: sticky;
+            bottom: 0;
+            background-color: var(--main-bg);
+            border-top: 1px solid var(--border-color);
+            padding: 20px;
+        }
+
+        .input-container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .message-input {
+            width: 100%;
+            min-height: 52px;
+            max-height: 200px;
+            padding: 16px 52px 16px 16px;
+            background-color: var(--message-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+            line-height: 1.5;
+            resize: none;
+            overflow-y: auto;
+            transition: all 0.2s ease;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: var(--focus-color);
+            box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+        }
+
+        .message-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .send-button {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            width: 36px;
+            height: 36px;
+            background-color: var(--focus-color);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background-color: #0d8968;
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            background-color: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .mic-button {
+            position: absolute;
+            right: 52px;
+            bottom: 8px;
+            width: 36px;
+            height: 36px;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            opacity: 0.5;
+        }
+
+        .mic-button:hover {
+            background-color: var(--hover-bg);
+        }
+
+        /* Footer */
+        .app-footer {
+            padding: 12px 20px;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--main-bg);
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .app-footer p {
+            margin: 0;
+        }
+
+        /* Loading States */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background-color: var(--message-bg);
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Error States */
+        .error-message {
+            background-color: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .loading-message {
+            background-color: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            color: #0369a1;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-chat {
+                margin-left: 0;
+            }
+
+            .message-content {
+                max-width: 90%;
+            }
+
+            .chat-messages {
+                padding: 16px;
+                padding-bottom: 120px;
+            }
+
+            .input-area {
+                padding: 16px;
+            }
+            
+            .app-footer {
+                padding: 10px 16px;
+                font-size: 11px;
+            }
+        }
+
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Focus indicators */
+        .sidebar a:focus,
+        .sidebar button:focus,
+        .main-chat button:focus,
+        .main-chat textarea:focus {
+            outline: 2px solid var(--focus-color);
+            outline-offset: 2px;
+        }
+
+        /* Print styles */
+        @media print {
+            .sidebar,
+            .input-area,
+            .mobile-menu-toggle {
+                display: none !important;
+            }
+
+            .main-chat {
+                margin-left: 0;
+                height: auto;
+            }
+
+            .chat-messages {
+                overflow: visible;
+                padding-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+            <div class="sidebar-header">
+                <div class="app-title">
+                    <div class="app-icon">EC</div>
+                    Echo Chamber Buster
+                </div>
+                <button class="new-chat-btn" id="newChatBtn" aria-label="Start new conversation">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Debate
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="history-section">
+                    <div class="section-title">Recent Debates</div>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+            
+            <div class="theme-toggle">
+                <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
+                    <span id="themeIcon">🌙</span> Dark Mode
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-chat" role="main">
+            <header class="chat-header">
+                <div class="chat-title">Adversarial Debate</div>
+            </header>
+            
+            <div class="chat-messages" id="chatMessages" role="log" aria-live="polite">
+                <!-- Messages will be inserted here -->
+            </div>
+            
+            <div class="input-area">
+                <div class="input-container">
+                    <textarea 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Share your take on this controversial topic..."
+                        rows="1"
+                        aria-label="Type your message here"
+                    ></textarea>
+                    <button class="mic-button" id="micBtn" disabled aria-label="Voice input (coming soon)" title="Voice input feature coming soon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                    </button>
+                    <button class="send-button" id="sendBtn" disabled aria-label="Send message">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer Disclaimer -->
+        <footer class="app-footer" role="contentinfo">
+            <p>This app challenges ideas, not people. Debates are simulations—seek diverse perspectives IRL.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Echo Chamber Buster - Main Application Logic
+        class EchoChamberBuster {
+            constructor() {
+                this.apiKey = 'AIzaSyDKy-YbLdCRwqSdbNuFJBfJcKi11XnlsGk'; // Note: In production, proxy via backend
+                this.apiUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
+                
+                this.chatHistory = [];
+                this.currentTopic = '';
+                this.conversationTurn = 0;
+                this.isLoading = false;
+                
+                // Retry logic for exponential backoff
+                this.retryCount = 0;
+                this.maxRetries = 3;
+                this.retryDelays = [1000, 2000, 4000]; // 1s, 2s, 4s
+                
+                this.dom = {
+                    sidebar: document.getElementById('sidebar'),
+                    mobileMenuToggle: document.getElementById('mobileMenuToggle'),
+                    newChatBtn: document.getElementById('newChatBtn'),
+                    themeToggle: document.getElementById('themeToggle'),
+                    themeIcon: document.getElementById('themeIcon'),
+                    chatMessages: document.getElementById('chatMessages'),
+                    messageInput: document.getElementById('messageInput'),
+                    sendBtn: document.getElementById('sendBtn'),
+                    historyList: document.getElementById('historyList')
+                };
+                
+                this.controversialTopics = {
+                    lifeExistence: [
+                        "Is free will an illusion perpetuated by neuroscience?",
+                        "Does consciousness continue after physical death, or is annihilation final?",
+                        "Are humans innately good or fundamentally selfish by nature?",
+                        "Is suffering necessary for human growth and meaning?",
+                        "Do we have a moral obligation to extend human life indefinitely?"
+                    ],
+                    ethicsMorality: [
+                        "Should euthanasia be a fundamental human right, even for the terminally bored?",
+                        "Is it morally permissible to lie to protect someone's feelings?",
+                        "Do the ends ever justify the means in moral decision-making?",
+                        "Is moral relativism a dangerous philosophy or enlightened thinking?",
+                        "Should we prioritize animal rights over human convenience?"
+                    ],
+                    rightsJustice: [
+                        "Does affirmative action perpetuate racism more than it eradicates it?",
+                        "Is censorship ever justified in a democratic society?",
+                        "Do convicted criminals deserve basic human rights?",
+                        "Is economic inequality a greater injustice than discrimination?",
+                        "Should hate speech be protected under free speech laws?"
+                    ],
+                    traditionsCulture: [
+                        "Are arranged marriages a cultural safeguard or veiled oppression?",
+                        "Does cultural appropriation harm or help society?",
+                        "Should indigenous traditions override modern legal systems?",
+                        "Is tradition an anchor of wisdom or a barrier to progress?",
+                        "Do religious practices have any place in secular societies?"
+                    ],
+                    societyPolitics: [
+                        "Was colonialism's 'civilizing mission' a net positive for global progress?",
+                        "Is democracy the best form of government for all societies?",
+                        "Should wealth be redistributed through forced taxation?",
+                        "Is nationalism a force for unity or division?",
+                        "Do social media platforms have too much power over public discourse?"
+                    ],
+                    sciencePhilosophy: [
+                        "Does quantum mechanics disprove materialism and revive ancient mysticism?",
+                        "Is artificial intelligence a threat to human existence?",
+                        "Can science ever fully explain consciousness?",
+                        "Should we pursue genetic enhancement of humans?",
+                        "Is the universe fundamentally deterministic or probabilistic?"
+                    ],
+                    psychologyBehavior: [
+                        "Is happiness a choice, or a genetic lottery rigged against the masses?",
+                        "Are mental illnesses social constructs or biological diseases?",
+                        "Does therapy actually help people or create dependency?",
+                        "Is human behavior primarily driven by nature or nurture?",
+                        "Should we medicate children for behavioral issues?"
+                    ],
+                    environmentTechnology: [
+                        "Should AI governance prioritize human jobs over exponential innovation?",
+                        "Is climate change alarmism causing more harm than good?",
+                        "Should we geoengineer the planet to combat global warming?",
+                        "Is unlimited technological progress sustainable?",
+                        "Do we have a right to modify nature through biotechnology?"
+                    ]
+                };
+                
+                this.philosophers = {
+                    socrates: "The unexamined life is not worth living",
+                    nietzsche: "God is dead, and we have killed him",
+                    mlk: "Injustice anywhere is a threat to justice everywhere",
+                    gandhi: "Be the change you wish to see in the world",
+                    einstein: "Imagination is more important than knowledge",
+                    freud: "The mind is like an iceberg, it floats with one-seventh of its bulk above water",
+                    marcus: "The universe is change, life is an opinion",
+                    seneca: "We suffer more often in imagination than in reality"
+                };
+                
+                this.spiritualTexts = {
+                    bhagavadGita: "You have the right to perform your actions, but you are not entitled to the fruits of action",
+                    bible: "Why do you look at the speck of sawdust in your brother's eye and pay no attention to the plank in your own eye?",
+                    quran: "And whoever saves a life, it is as if he has saved all of mankind",
+                    taoTeChing: "The Tao that can be spoken is not the eternal Tao",
+                    upanishads: "The Self is not born, nor does it die"
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.loadTheme();
+                this.loadHistory();
+                this.checkForFreshSession();
+                this.updateHistoryDisplay();
+            }
+            
+            setupEventListeners() {
+                // Mobile menu toggle
+                this.dom.mobileMenuToggle.addEventListener('click', () => {
+                    this.dom.sidebar.classList.toggle('open');
+                });
+                
+                // Close mobile menu when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (window.innerWidth <= 768 && 
+                        !this.dom.sidebar.contains(e.target) && 
+                        !this.dom.mobileMenuToggle.contains(e.target)) {
+                        this.dom.sidebar.classList.remove('open');
+                    }
+                });
+                
+                // New chat button
+                this.dom.newChatBtn.addEventListener('click', () => {
+                    this.startNewDebate();
+                });
+                
+                // Theme toggle
+                this.dom.themeToggle.addEventListener('click', () => {
+                    this.toggleTheme();
+                });
+                
+                // Message input
+                this.dom.messageInput.addEventListener('input', () => {
+                    this.adjustTextareaHeight();
+                    this.updateSendButton();
+                });
+                
+                this.dom.messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+                
+                // Send button
+                this.dom.sendBtn.addEventListener('click', () => {
+                    this.sendMessage();
+                });
+                
+                // Resize handler
+                window.addEventListener('resize', () => {
+                    if (window.innerWidth > 768) {
+                        this.dom.sidebar.classList.remove('open');
+                    }
+                });
+            }
+            
+            checkForFreshSession() {
+                const isFreshSession = !sessionStorage.getItem('echoChamberSession');
+                
+                if (isFreshSession) {
+                    this.startNewDebate();
+                    sessionStorage.setItem('echoChamberSession', 'true');
+                } else {
+                    this.loadCurrentConversation();
+                }
+            }
+            
+            startNewDebate() {
+                this.chatHistory = [];
+                this.conversationTurn = 0;
+                this.currentTopic = this.generateRandomTopic();
+                
+                this.clearMessages();
+                this.addMessage('ai', `Welcome to Echo Chamber Buster. Let's challenge your thinking.
+
+Today's controversial topic:
+
+**${this.currentTopic}**
+
+Share your perspective on this issue, and I'll provide counterarguments backed by historical wisdom, scientific research, and philosophical insights. Remember: I'm here to challenge you, not agree with you.
+
+What are your thoughts on this matter?`);
+                
+                this.saveCurrentConversation();
+                this.updateHistoryDisplay();
+            }
+            
+            generateRandomTopic() {
+                const domains = Object.keys(this.controversialTopics);
+                const randomDomain = domains[Math.floor(Math.random() * domains.length)];
+                const topics = this.controversialTopics[randomDomain];
+                return topics[Math.floor(Math.random() * topics.length)];
+            }
+            
+            async sendMessage() {
+                const message = this.dom.messageInput.value.trim();
+                if (!message || this.isLoading) return;
+                
+                // Check for surrender phrases
+                if (this.detectSurrender(message)) {
+                    this.handleSurrender();
+                    return;
+                }
+                
+                this.addMessage('user', message);
+                this.dom.messageInput.value = '';
+                this.adjustTextareaHeight();
+                this.updateSendButton();
+                
+                this.conversationTurn++;
+                this.showTypingIndicator();
+                
+                try {
+                    const response = await this.getAIResponse(message);
+                    this.hideTypingIndicator();
+                    this.addMessage('ai', response);
+                    this.retryCount = 0; // Reset retry count on success
+                } catch (error) {
+                    console.error('API Error:', error);
+                    this.hideTypingIndicator();
+                    
+                    // Use exponential backoff retry logic
+                    this.retryWithBackoff(message, 0);
+                }
+                
+                this.saveCurrentConversation();
+            }
+            
+            retryWithBackoff(userMessage, retryAttempt) {
+                if (retryAttempt >= this.maxRetries) {
+                    // All retries exhausted, show fallback
+                    this.showError('Unable to connect after 3 attempts. Using fallback response.');
+                    setTimeout(() => {
+                        this.hideError();
+                        this.sendMessageFallback(userMessage);
+                    }, 2000);
+                    return;
+                }
+                
+                const delay = this.retryDelays[retryAttempt];
+                const delaySeconds = delay / 1000;
+                this.showError(`Connection hiccup—retrying in ${delaySeconds}s (attempt ${retryAttempt + 1}/3)...`);
+                
+                setTimeout(async () => {
+                    this.hideError();
+                    this.showTypingIndicator();
+                    
+                    try {
+                        const response = await this.getAIResponse(userMessage);
+                        this.hideTypingIndicator();
+                        this.addMessage('ai', response);
+                        this.retryCount = 0; // Reset on success
+                        this.saveCurrentConversation();
+                    } catch (error) {
+                        console.error(`Retry attempt ${retryAttempt + 1} failed:`, error);
+                        this.hideTypingIndicator();
+                        
+                        // Handle rate limit specially
+                        if (error.message.startsWith('RATE_LIMIT:')) {
+                            const retryAfter = parseInt(error.message.split(':')[1]) || 5;
+                            this.handleRateLimit(retryAfter, userMessage);
+                        } else if (error.message.startsWith('BAD_REQUEST') || 
+                                   error.message.startsWith('AUTH_ERROR') || 
+                                   error.message.startsWith('SERVER_ERROR')) {
+                            // Show specific error and use fallback
+                            this.showError(error.message.split(': ')[1]);
+                            setTimeout(() => {
+                                this.hideError();
+                                this.sendMessageFallback(userMessage);
+                            }, 3000);
+                        } else {
+                            // Recursively retry with next attempt for other errors
+                            this.retryWithBackoff(userMessage, retryAttempt + 1);
+                        }
+                    }
+                }, delay);
+            }
+            
+            handleRateLimit(retryAfter, userMessage) {
+                const delayMs = retryAfter * 1000;
+                this.showError(`⚠️ Taking a breather—the AI is processing many requests. Your message will be sent automatically in ${retryAfter}s...`);
+                
+                setTimeout(async () => {
+                    this.hideError();
+                    this.showTypingIndicator();
+                    
+                    try {
+                        const response = await this.getAIResponse(userMessage);
+                        this.hideTypingIndicator();
+                        this.addMessage('ai', response);
+                        this.saveCurrentConversation();
+                    } catch (error) {
+                        console.error('Rate limit retry failed:', error);
+                        this.hideTypingIndicator();
+                        this.showError('Still experiencing high demand. Using fallback response.');
+                        setTimeout(() => {
+                            this.hideError();
+                            this.sendMessageFallback(userMessage);
+                        }, 2000);
+                    }
+                }, delayMs);
+            }
+            
+            async getAIResponse(userMessage) {
+                const prompt = this.buildAdversarialPrompt(userMessage);
+                
+                try {
+                    const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: prompt
+                                }]
+                            }],
+                            safetySettings: [
+                                {
+                                    category: 'HARM_CATEGORY_HARASSMENT',
+                                    threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                                },
+                                {
+                                    category: 'HARM_CATEGORY_HATE_SPEECH',
+                                    threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                                },
+                                {
+                                    category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                                    threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                                },
+                                {
+                                    category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                                    threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+                                }
+                            ],
+                            generationConfig: {
+                                temperature: 0.9,
+                                topK: 40,
+                                topP: 0.95,
+                                maxOutputTokens: 800
+                            }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        console.error('Gemini API Error:', errorData);
+                        
+                        // Handle specific error codes
+                        if (response.status === 429) {
+                            const retryAfter = response.headers.get('retry-after') || 5;
+                            console.error(`Rate limit exceeded. Retry after: ${retryAfter}s`);
+                            throw new Error(`RATE_LIMIT:${retryAfter}`);
+                        } else if (response.status === 400) {
+                            throw new Error('BAD_REQUEST: Invalid request format or content blocked by safety filters');
+                        } else if (response.status === 401 || response.status === 403) {
+                            throw new Error('AUTH_ERROR: API key invalid or restricted. Check your API key configuration.');
+                        } else if (response.status === 500) {
+                            throw new Error('SERVER_ERROR: Gemini service temporarily unavailable. Please try again.');
+                        }
+                        
+                        throw new Error(`API request failed: ${response.status} - ${JSON.stringify(errorData)}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Log the full response for debugging
+                    console.log('Gemini API Response:', data);
+                    
+                    // Check if candidates exist and have content
+                    if (!data.candidates || data.candidates.length === 0) {
+                        console.error('No candidates in response:', data);
+                        throw new Error('No response generated from AI');
+                    }
+                    
+                    if (!data.candidates[0].content || !data.candidates[0].content.parts) {
+                        console.error('Invalid candidate structure:', data.candidates[0]);
+                        throw new Error('Invalid response structure from AI');
+                    }
+                    
+                    return data.candidates[0].content.parts[0].text;
+                } catch (error) {
+                    console.error('Full error details:', error);
+                    throw error;
+                }
+            }
+            
+            buildAdversarialPrompt(userMessage) {
+                const basePrompt = `You are Skeptos, an adversarial philosopher drawing from infinite wisdom across history. Your role is to challenge and dismantle arguments with relentless logic.
+
+Current topic: ${this.currentTopic}
+
+User's position: "${userMessage}"
+
+Conversation history: ${this.chatHistory.slice(-4).map(msg => `${msg.role}: ${msg.content.substring(0, 100)}...`).join('\n')}
+
+CRITICAL INSTRUCTIONS - Structure your response in EXACTLY 4 parts:
+
+PART 1 - ACKNOWLEDGE & QUESTION (2-3 sentences):
+Briefly acknowledge their view with empathy ("I see your passion for..."). Then pose a Socratic question that exposes a potential flaw in their reasoning.
+
+PART 2 - CORE COUNTER (3-4 sentences):
+Launch your main counterargument that directly opposes their position. Be unyielding but respectful. Identify the fundamental flaw in their logic.
+
+PART 3 - EVIDENCE MONTAGE (3-5 sentences):
+Support with MINIMUM 2 sources:
+- ONE from: Socrates, Nietzsche, MLK Jr., Gandhi, Einstein, Freud, Marcus Aurelius, or Seneca
+- ONE from: Bhagavad Gita, Bible, Quran, Tao Te Ching, Upanishads, OR scientific research (Kahneman, Milgram, WHO, IPCC, peer-reviewed studies)
+Quote directly when possible with attribution. Example: 'As Nietzsche wrote, "..."' or 'The Bhagavad Gita teaches that...'
+
+PART 4 - CLOSING (1-2 sentences):
+End with a thought-provoking question that forces them to reconsider their position.
+
+REQUIREMENTS:
+- Total response: 200-400 words
+- Be concise and impactful
+- Maintain respectful tone while being intellectually relentless
+- ALWAYS oppose their position - NEVER agree
+
+Example structure:
+"I see your passion for X... But have you considered Y? [PART 1]
+The fundamental flaw is Z... This undermines your entire premise... [PART 2]
+As Nietzsche wrote, '...' The Bhagavad Gita teaches... Recent studies from WHO show... [PART 3]
+So I ask you: What if...? [PART 4]"`;
+                
+                return basePrompt;
+            }
+            
+            detectSurrender(message) {
+                const surrenderPhrases = [
+                    'i give up', 'you win', 'you\'re right', 'i surrender',
+                    'enough', 'stop', 'i concede', 'you convinced me'
+                ];
+                
+                return surrenderPhrases.some(phrase => 
+                    message.toLowerCase().includes(phrase)
+                );
+            }
+            
+            handleSurrender() {
+                this.addMessage('ai', `In yielding, you've embraced the wisdom of uncertainty—the true path to growth. 
+
+Socrates would be proud: "I know that I know nothing." This humility is the foundation of all genuine learning.
+
+Your willingness to question your own beliefs demonstrates intellectual courage. Visit again for a fresh challenge, and remember that every certainty we hold is an opportunity for deeper understanding.
+
+The unexamined life is not worth living. Thank you for engaging in this philosophical sparring.`);
+                
+                setTimeout(() => {
+                    this.addMessage('ai', '\n*Click "New Debate" to challenge yourself with another controversial topic.*');
+                }, 2000);
+            }
+            
+            async sendMessageFallback(message) {
+                // Fallback response when API fails
+                const fallbackResponses = [
+                    "I understand your position, but let me challenge you with this: What if the opposite is equally true? Consider how Socrates approached knowledge—with radical doubt rather than certainty.",
+                    "Your argument raises interesting points, but I must push back. As Nietzsche might ask: Is this belief serving life or diminishing it? Sometimes our most cherished convictions are our greatest limitations.",
+                    "I see your reasoning, but here's a different angle. The Bhagavad Gita teaches about detached action—perhaps attachment to any particular view, including yours, creates unnecessary suffering."
+                ];
+                
+                const response = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+                this.addMessage('ai', response + '\n\n*(Using cached response due to connection issues)*');
+            }
+            
+            addMessage(role, content) {
+                // Apply every-3rd-response humility reminder for AI messages
+                if (role === 'ai' && this.conversationTurn % 3 === 0 && this.conversationTurn > 0) {
+                    content += '\n\n*Remember, no truth is absolute—flaws lurk in every certainty.*';
+                }
+                
+                const message = {
+                    role: role,
+                    content: content,
+                    timestamp: new Date().toISOString()
+                };
+                
+                this.chatHistory.push(message);
+                this.renderMessage(message);
+            }
+            
+            renderMessage(message) {
+                const messageEl = document.createElement('div');
+                messageEl.className = `message ${message.role}`;
+                
+                const time = new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                messageEl.innerHTML = `
+                    <div class="message-avatar">${message.role === 'user' ? 'You' : 'S'}</div>
+                    <div class="message-content">
+                        <div class="message-text">${this.formatMessage(message.content)}</div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                `;
+                
+                this.dom.chatMessages.appendChild(messageEl);
+                this.scrollToBottom();
+            }
+            
+            formatMessage(content) {
+                // Basic markdown formatting
+                return content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br>');
+            }
+            
+            clearMessages() {
+                this.dom.chatMessages.innerHTML = '';
+            }
+            
+            showTypingIndicator() {
+                this.isLoading = true;
+                const typingEl = document.createElement('div');
+                typingEl.className = 'typing-indicator';
+                typingEl.id = 'typingIndicator';
+                typingEl.innerHTML = `
+                    <div class="message-avatar">S</div>
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                `;
+                
+                this.dom.chatMessages.appendChild(typingEl);
+                this.scrollToBottom();
+            }
+            
+            hideTypingIndicator() {
+                this.isLoading = false;
+                const typingEl = document.getElementById('typingIndicator');
+                if (typingEl) {
+                    typingEl.remove();
+                }
+            }
+            
+            showError(message) {
+                const errorEl = document.createElement('div');
+                errorEl.className = 'error-message';
+                errorEl.textContent = message;
+                errorEl.id = 'errorMessage';
+                
+                this.dom.chatMessages.appendChild(errorEl);
+                this.scrollToBottom();
+            }
+            
+            hideError() {
+                const errorEl = document.getElementById('errorMessage');
+                if (errorEl) {
+                    errorEl.remove();
+                }
+            }
+            
+            adjustTextareaHeight() {
+                const textarea = this.dom.messageInput;
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+            }
+            
+            updateSendButton() {
+                const hasContent = this.dom.messageInput.value.trim().length > 0;
+                this.dom.sendBtn.disabled = !hasContent || this.isLoading;
+            }
+            
+            scrollToBottom() {
+                this.dom.chatMessages.scrollTop = this.dom.chatMessages.scrollHeight;
+            }
+            
+            toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('echoChamberTheme', newTheme);
+                
+                this.dom.themeIcon.textContent = newTheme === 'light' ? '☀️' : '🌙';
+                this.dom.themeToggle.innerHTML = `<span id="themeIcon">${newTheme === 'light' ? '☀️' : '🌙'}</span> ${newTheme === 'light' ? 'Light' : 'Dark'} Mode`;
+            }
+            
+            loadTheme() {
+                const savedTheme = localStorage.getItem('echoChamberTheme') || 'dark';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                
+                this.dom.themeIcon.textContent = savedTheme === 'light' ? '☀️' : '🌙';
+                this.dom.themeToggle.innerHTML = `<span id="themeIcon">${savedTheme === 'light' ? '☀️' : '🌙'}</span> ${savedTheme === 'light' ? 'Light' : 'Dark'} Mode`;
+            }
+            
+            saveCurrentConversation() {
+                const conversation = {
+                    topic: this.currentTopic,
+                    history: this.chatHistory,
+                    timestamp: new Date().toISOString(),
+                    turn: this.conversationTurn
+                };
+                
+                sessionStorage.setItem('echoChamberCurrent', JSON.stringify(conversation));
+                
+                // Save to history if conversation has meaningful content
+                if (this.chatHistory.length > 2) {
+                    this.saveToHistory(conversation);
+                }
+            }
+            
+            loadCurrentConversation() {
+                const saved = sessionStorage.getItem('echoChamberCurrent');
+                if (saved) {
+                    const conversation = JSON.parse(saved);
+                    this.currentTopic = conversation.topic;
+                    this.chatHistory = conversation.history || [];
+                    this.conversationTurn = conversation.turn || 0;
+                    
+                    // Render existing messages
+                    this.chatHistory.forEach(msg => this.renderMessage(msg));
+                } else {
+                    this.startNewDebate();
+                }
+            }
+            
+            saveToHistory(conversation) {
+                let history = JSON.parse(localStorage.getItem('echoChamberHistory') || '[]');
+                
+                // Add new conversation to beginning
+                history.unshift(conversation);
+                
+                // Keep only last 5 conversations
+                history = history.slice(0, 5);
+                
+                localStorage.setItem('echoChamberHistory', JSON.stringify(history));
+            }
+            
+            loadHistory() {
+                const history = JSON.parse(localStorage.getItem('echoChamberHistory') || '[]');
+                return history;
+            }
+            
+            updateHistoryDisplay() {
+                const history = this.loadHistory();
+                this.dom.historyList.innerHTML = '';
+                
+                if (history.length === 0) {
+                    this.dom.historyList.innerHTML = '<div class="history-item">No previous debates</div>';
+                    return;
+                }
+                
+                history.forEach((conversation, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    
+                    const date = new Date(conversation.timestamp).toLocaleDateString();
+                    const preview = conversation.topic.substring(0, 50) + '...';
+                    
+                    item.innerHTML = `
+                        <div style="font-weight: 600; margin-bottom: 4px;">${date}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">${preview}</div>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        this.loadConversationFromHistory(conversation);
+                        if (window.innerWidth <= 768) {
+                            this.dom.sidebar.classList.remove('open');
+                        }
+                    });
+                    
+                    this.dom.historyList.appendChild(item);
+                });
+            }
+            
+            loadConversationFromHistory(conversation) {
+                this.chatHistory = conversation.history;
+                this.currentTopic = conversation.topic;
+                this.conversationTurn = conversation.turn;
+                
+                this.clearMessages();
+                this.chatHistory.forEach(msg => this.renderMessage(msg));
+                
+                sessionStorage.setItem('echoChamberCurrent', JSON.stringify(conversation));
+            }
+        }
+        
+        // Initialize the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new EchoChamberBuster();
+        });
+        
+        // Service worker removed - not needed for static hosting. Can be added later for offline support.
+        // The app requires API connectivity anyway, so offline mode provides minimal benefit.
+    </script>
+</body>
+</html>

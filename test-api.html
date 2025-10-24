@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini API Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        button {
+            background: #10A37F;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0d8968;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #333;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Gemini API Connection Test</h1>
+        <p>Testing API: <code>AIzaSyDKy-YbLdCRwqSdbNuFJBfJcKi11XnlsGk</code></p>
+        
+        <input type="text" id="testPrompt" placeholder="Enter test prompt (or leave empty for default)" value="Tell me a very short joke about programming">
+        
+        <div>
+            <button onclick="testAPI()">🔍 Test API Connection</button>
+            <button onclick="testSimple()">⚡ Simple Test</button>
+            <button onclick="clearResult()">🗑️ Clear</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyDKy-YbLdCRwqSdbNuFJBfJcKi11XnlsGk';
+        const API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
+
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            const prompt = document.getElementById('testPrompt').value || 'Tell me a very short joke about programming';
+            
+            resultDiv.innerHTML = '<div class="success">⏳ Testing API connection...</div>';
+            
+            try {
+                console.log('Sending request to:', `${API_URL}?key=${API_KEY}`);
+                console.log('Prompt:', prompt);
+                
+                const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: prompt
+                            }]
+                        }],
+                        generationConfig: {
+                            temperature: 0.9,
+                            topK: 40,
+                            topP: 0.95,
+                            maxOutputTokens: 800
+                        }
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const data = await response.json();
+                console.log('Full response data:', data);
+                
+                if (!response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ API Error (${response.status})</div>
+                        <div style="margin-top: 10px;">
+                            <strong>Error Details:</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.candidates && data.candidates[0]) {
+                    const text = data.candidates[0].content.parts[0].text;
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ API Connection Successful!</div>
+                        <div style="margin-top: 10px;">
+                            <strong>Response:</strong>
+                            <p style="margin-top: 10px; padding: 10px; background: #1a1a1a; border-left: 3px solid #10A37F;">
+                                ${text}
+                            </p>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 12px; color: #888;">
+                            <strong>Full Response:</strong>
+                            <pre style="font-size: 11px;">${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">⚠️ Unexpected Response Structure</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">❌ Connection Failed</div>
+                    <div style="margin-top: 10px;">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <strong>Stack:</strong>
+                        <pre style="font-size: 11px;">${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function testSimple() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="success">⏳ Running simple test...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: 'Say hello' }]
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.candidates) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Simple Test Passed!</div>
+                        <p style="margin-top: 10px;">${data.candidates[0].content.parts[0].text}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ Simple Test Failed</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        function clearResult() {
+            document.getElementById('result').innerHTML = '';
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testAPI, 500);
+        });
+    </script>
+</body>
+</html>
