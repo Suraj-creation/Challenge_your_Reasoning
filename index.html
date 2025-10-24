@@ -136,14 +136,19 @@
             background-color: var(--main-bg);
             color: var(--text-primary);
             line-height: 1.6;
-            overflow-x: hidden;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
         }
 
         /* Layout */
         .app-container {
             display: flex;
             height: 100vh;
-            width: 100%;
+            width: 100vw;
+            overflow: hidden;
         }
 
         /* Sidebar */
@@ -287,6 +292,8 @@
             flex-direction: column;
             position: relative;
             min-width: 0;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .chat-header {
@@ -295,6 +302,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
         }
 
         .chat-title {
@@ -305,8 +313,9 @@
         .chat-messages {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 20px;
-            padding-bottom: 100px;
+            padding-bottom: 20px;
         }
 
         .message {
@@ -374,11 +383,12 @@
 
         /* Input Area */
         .input-area {
-            position: sticky;
+            position: relative;
             bottom: 0;
             background-color: var(--main-bg);
             border-top: 1px solid var(--border-color);
             padding: 20px;
+            flex-shrink: 0;
         }
 
         .input-container {
@@ -390,8 +400,8 @@
         .message-input {
             width: 100%;
             min-height: 52px;
-            max-height: 200px;
-            padding: 16px 52px 16px 16px;
+            max-height: 150px;
+            padding: 16px 100px 16px 16px;
             background-color: var(--message-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -466,13 +476,15 @@
 
         /* Footer */
         .app-footer {
-            padding: 12px 20px;
+            padding: 10px 20px;
             text-align: center;
             border-top: 1px solid var(--border-color);
             background-color: var(--main-bg);
             color: var(--text-secondary);
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: 12px;
+            line-height: 1.3;
+            flex-shrink: 0;
+            position: relative;
         }
 
         .app-footer p {
@@ -712,7 +724,7 @@
         // Echo Chamber Buster - Main Application Logic
         class EchoChamberBuster {
             constructor() {
-                this.apiKey = 'AIzaSyDKy-YbLdCRwqSdbNuFJBfJcKi11XnlsGk'; // Note: In production, proxy via backend
+                this.apiKey = 'AIzaSyCPJYlKpIqOXE3g6EzKhuiwiyYlEPqW0nI'; // Note: In production, proxy via backend
                 this.apiUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
                 
                 this.chatHistory = [];
